@@ -1,4 +1,5 @@
-﻿using GraphQL.WebApi.Repository;
+﻿using GraphQL.WebApi;
+using GraphQL.WebApi.Repository;
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.TestHost;
@@ -7,6 +8,7 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 
 namespace Testing.Helpers
@@ -40,13 +42,22 @@ namespace Testing.Helpers
                 //}
                
             });
-           
-            webHostBuilder.UseStartup<TestStartup>();
-            Server = new TestServer(webHostBuilder);
+
+
+            Server = new TestServer(webHostBuilder.UseStartup<Startup>());
+            Client = Server.CreateClient();          
+
             Context = Server.Host.Services.GetService(typeof(DatabaseContext)) as DatabaseContext;
-            Client = Server.CreateClient();
+           
         }
 
+        private static Random random = new Random();
+        public static string RandomString(int length)
+        {
+            const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+            return new string(Enumerable.Repeat(chars, length)
+              .Select(s => s[random.Next(s.Length)]).ToArray());
+        }
         public void Dispose()
         {
             Context.Dispose();

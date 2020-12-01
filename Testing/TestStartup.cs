@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Testing
@@ -50,24 +51,44 @@ namespace Testing
             services.AddScoped<IDependencyResolver>(s => new FuncDependencyResolver(s.GetRequiredService));
             services.AddScoped<GraphQLSchema>();
 
-            services.AddGraphQL()
-              .AddGraphTypes(ServiceLifetime.Scoped);
+            services.AddGraphQL(o => { o.ExposeExceptions = _env.IsDevelopment(); })
+              .AddGraphTypes(ServiceLifetime.Scoped)
+              .AddWebSockets();
+
+            services.AddCors();
+           
+            services.AddControllers()
+                .AddNewtonsoftJson(options =>
+                       options.SerializerSettings.ReferenceLoopHandling = Newtonsoft.Json.ReferenceLoopHandling.Ignore
+                );
+
         }
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env, ILoggerFactory loggerFactory)
         {
             var logger = loggerFactory.CreateLogger<TestStartup>();
             logger.LogInformation($"ConnectionString: {Configuration["ConnectionString"]}");
-
-            using (var serviceScope = app.ApplicationServices.GetService<IServiceScopeFactory>().CreateScope())
+            if (env.IsDevelopment())
             {
-                serviceScope.ServiceProvider.GetRequiredService<DatabaseContext>().Database.Migrate();
+                using (var serviceScope = app.ApplicationServices.GetService<IServiceScopeFactory>().CreateScope())
+                {
+                    serviceScope.ServiceProvider.GetRequiredService<DatabaseContext>().Database.Migrate();
+                }
             }
 
-            //app.UseCors(builder =>
-            //   builder.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());            
-                   
+            app.UseCors(builder =>
+               builder.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
+
+            app.UseWebSockets();
+            app.UseGraphQLWebSockets<GraphQLSchema>();
+          
             app.UseRouting();
-            
+
+            app.UseEndpoints(endpoints =>
+            {
+                endpoints.MapControllers();
+            });
+
+
         }
     }
 }
